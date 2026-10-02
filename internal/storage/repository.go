@@ -16,7 +16,6 @@ type Repository interface {
 		ctx context.Context,
 		commandID string,
 		decision domain.InterlockDecision,
-		assessment domain.ReviewAssessment,
 		token string,
 		now time.Time,
 	) (domain.GateCommand, domain.Gate, error)

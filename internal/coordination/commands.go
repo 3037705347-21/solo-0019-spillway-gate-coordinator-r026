@@ -63,14 +63,6 @@ func (s *Service) ReviewInterlock(
 	if err != nil {
 		return domain.GateCommand{}, domain.Gate{}, err
 	}
-	gate, err := s.repository.Gate(ctx, command.GateID)
-	if err != nil {
-		return domain.GateCommand{}, domain.Gate{}, err
-	}
-	assessment, err := command.AssessReview(gate)
-	if err != nil {
-		return domain.GateCommand{}, domain.Gate{}, err
-	}
 
 	token := ""
 	if decision.IsClear() {
@@ -83,7 +75,7 @@ func (s *Service) ReviewInterlock(
 		}
 	}
 
-	return s.repository.ReviewCommand(ctx, commandID, decision, assessment, token, s.now())
+	return s.repository.ReviewCommand(ctx, command.ID, decision, token, s.now())
 }
 
 func (s *Service) ExecuteCommand(

@@ -83,7 +83,6 @@ func (m *MemoryRepository) ReviewCommand(
 	_ context.Context,
 	commandID string,
 	decision domain.InterlockDecision,
-	assessment domain.ReviewAssessment,
 	token string,
 	now time.Time,
 ) (domain.GateCommand, domain.Gate, error) {
@@ -99,22 +98,22 @@ func (m *MemoryRepository) ReviewCommand(
 		return domain.GateCommand{}, domain.Gate{}, domain.NotFound("gate_not_found", "gate id was not found")
 	}
 
+	// Reassess against the gate inside the critical section so a command that
+	// went stale after it was read (the gate moved to a different position, or
+	// the requested position was already reached) can never reserve the gate or
+	// receive an execution token.
+	assessment, err := command.AssessReview(gate)
+	if err != nil {
+		return domain.GateCommand{}, domain.Gate{}, err
+	}
+
 	nextCommand := cloneCommand(command)
-	if decision.IsClear() &&
-		(assessment.Kind == domain.ReviewSuperseded || gate.ActiveCommandID != "") {
-		if err := nextCommand.Review(decision, token, now); err != nil {
+	if decision.IsClear() && assessment.Kind == domain.ReviewSuperseded {
+		if err := nextCommand.RejectReview(decision, assessment, now); err != nil {
 			return domain.GateCommand{}, domain.Gate{}, err
 		}
-
-		nextGate := gate
-		nextGate.Status = domain.GateReserved
-		nextGate.ActiveCommandID = nextCommand.ID
-		nextGate.UpdatedAt = now.UTC()
-		nextGate.Version++
-
 		m.commands[nextCommand.ID] = nextCommand
-		m.gates[nextGate.ID] = nextGate
-		return cloneCommand(nextCommand), nextGate, nil
+		return cloneCommand(nextCommand), gate, nil
 	}
 	if decision.IsClear() && assessment.Kind == domain.ReviewSatisfied {
 		if err := nextCommand.RejectReview(decision, assessment, now); err != nil {
