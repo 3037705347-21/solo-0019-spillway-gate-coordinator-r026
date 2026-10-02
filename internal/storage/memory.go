@@ -100,28 +100,20 @@ func (m *MemoryRepository) ReviewCommand(
 	}
 
 	nextCommand := cloneCommand(command)
-	if decision.IsClear() &&
-		(assessment.Kind == domain.ReviewSuperseded || gate.ActiveCommandID != "") {
-		if err := nextCommand.Review(decision, token, now); err != nil {
-			return domain.GateCommand{}, domain.Gate{}, err
+	if decision.IsClear() {
+		if assessment.Kind != domain.ReviewReady {
+			if err := nextCommand.RejectReview(decision, assessment, now); err != nil {
+				return domain.GateCommand{}, domain.Gate{}, err
+			}
+			m.commands[nextCommand.ID] = nextCommand
+			return cloneCommand(nextCommand), gate, nil
 		}
-
-		nextGate := gate
-		nextGate.Status = domain.GateReserved
-		nextGate.ActiveCommandID = nextCommand.ID
-		nextGate.UpdatedAt = now.UTC()
-		nextGate.Version++
-
-		m.commands[nextCommand.ID] = nextCommand
-		m.gates[nextGate.ID] = nextGate
-		return cloneCommand(nextCommand), nextGate, nil
-	}
-	if decision.IsClear() && assessment.Kind == domain.ReviewSatisfied {
-		if err := nextCommand.RejectReview(decision, assessment, now); err != nil {
-			return domain.GateCommand{}, domain.Gate{}, err
+		if gate.ActiveCommandID != "" {
+			return domain.GateCommand{}, domain.Gate{}, domain.Conflict(
+				"gate_already_reserved",
+				"gate already references an active command",
+			)
 		}
-		m.commands[nextCommand.ID] = nextCommand
-		return cloneCommand(nextCommand), gate, nil
 	}
 
 	if err := nextCommand.Review(decision, token, now); err != nil {

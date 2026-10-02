@@ -78,14 +78,14 @@ func (c GateCommand) AssessReview(gate Gate) (ReviewAssessment, error) {
 		StartingAperture: c.StartingAperture,
 		CurrentAperture:  gate.Aperture,
 	}
+	if reviewApertureEqual(c.TargetAperture, gate.Aperture) {
+		assessment.Kind = ReviewSatisfied
+		assessment.Reason = "command target aperture is already reported by the gate"
+		return assessment, nil
+	}
 	if !reviewApertureEqual(c.StartingAperture, gate.Aperture) {
 		assessment.Kind = ReviewSuperseded
 		assessment.Reason = "command starting aperture no longer matches the reported gate position"
-		return assessment, nil
-	}
-	if reviewApertureEqual(c.TargetAperture, gate.Aperture) {
-		assessment.Kind = ReviewReady
-		assessment.Reason = "command target is already present and can be reviewed"
 		return assessment, nil
 	}
 
